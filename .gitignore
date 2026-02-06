@@ -1,0 +1,23 @@
+# .NET build output
+**/bin/
+**/obj/
+
+# NuGet
+*.nupkg
+*.snupkg
+
+# Visual Studio / Rider
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.cache
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Claude Code project memory
+.claude/
+memory/

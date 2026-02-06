@@ -1,0 +1,25 @@
+# Version control
+.git
+.gitignore
+
+# Documentation
+README.md
+FIPS-COMPLIANCE.md
+
+# Tests (not needed in build context)
+tests/
+
+# IDE / editor
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Claude Code project memory
+.claude/
+memory/
