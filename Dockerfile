@@ -94,9 +94,9 @@ RUN aspnetcore_version=9.0.12 \
 FROM amd64/debian:bookworm-slim
 
 # -- Metadata ----------------------------------------------------------------
-LABEL maintainer="https://github.com/he3/dotnet-aspnet-fips" \
+LABEL maintainer="https://github.com/he3-org/dotnet-aspnet-fips" \
       description="ASP.NET Core 9.0 Runtime with OpenSSL FIPS 140-2 validated module" \
-      org.opencontainers.image.source="https://github.com/he3/dotnet-aspnet-fips" \
+      org.opencontainers.image.source="https://github.com/he3-org/dotnet-aspnet-fips" \
       openssl.fips.version="3.0.9" \
       openssl.fips.certificate="4282"
 
