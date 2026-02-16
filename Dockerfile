@@ -96,7 +96,7 @@ FROM amd64/alpine:3.23
 # -- Metadata ----------------------------------------------------------------
 LABEL maintainer="https://github.com/he3/dotnet-aspnet-fips" \
       description="ASP.NET Core 10.0 Runtime with OpenSSL FIPS 140-2 validated module" \
-      org.opencontainers.image.source="https://github.com/he3/dotnet-aspnet-fips" \
+      org.opencontainers.image.source="https://github.com/he3-org/dotnet-aspnet-fips" \
       openssl.fips.version="3.1.2" \
       openssl.fips.certificate="4985"
 
