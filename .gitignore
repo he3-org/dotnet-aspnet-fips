@@ -6,6 +6,16 @@
 *.nupkg
 *.snupkg
 
+# Docker build artifacts
+app-temp/
+webapp-logs.zip
+
+# Test certificates (use your own for testing)
+tests/FipsValidation/test-certs/
+
+# Environment files (may contain passwords)
+.env
+
 # Visual Studio / Rider
 .vs/
 .vscode/

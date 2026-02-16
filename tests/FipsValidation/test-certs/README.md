@@ -5,24 +5,42 @@ This directory should contain your PKCS#12 certificate files (`.p12` or `.pfx`) 
 ## Setup
 
 1. Place one or more `.p12` or `.pfx` files in this directory
-2. Set the `PFX_PASSWORD` environment variable to your certificate password before running tests:
 
-   **Windows:**
-   ```powershell
-   $env:PFX_PASSWORD = "your-password"
-   dotnet run --project tests/FipsValidation
-   ```
+2. Set the certificate password using **one of these methods**:
 
-   **Linux/macOS:**
-   ```bash
-   export PFX_PASSWORD="your-password"
-   dotnet run --project tests/FipsValidation
-   ```
+    **Option A: .env file (recommended for local development)**
 
-   **Docker:**
-   ```bash
-   docker run -e PFX_PASSWORD="your-password" henryerich/dotnet-aspnet-fips:test
-   ```
+    Create a `.env` file in the project root (`tests/FipsValidation/.env`):
+
+    ```bash
+    PFX_PASSWORD=your-password
+    ```
+
+    Then run:
+
+    ```bash
+    dotnet run --project tests/FipsValidation
+    ```
+
+    **Option B: Environment variable (Windows)**
+
+    ```powershell
+    $env:PFX_PASSWORD = "your-password"
+    dotnet run --project tests/FipsValidation
+    ```
+
+    **Option C: Environment variable (Linux/macOS)**
+
+    ```bash
+    export PFX_PASSWORD="your-password"
+    dotnet run --project tests/FipsValidation
+    ```
+
+    **Option D: Docker**
+
+    ```bash
+    docker run -e PFX_PASSWORD="your-password" henryerich/dotnet-aspnet-fips:test
+    ```
 
 3. If `PFX_PASSWORD` is not set, an empty password will be used
 
@@ -37,6 +55,7 @@ Certificate files are excluded from version control (`.gitignore`) to prevent ac
 - Password protection is supported via `PFX_PASSWORD` environment variable
 
 The FipsValidation test will load each certificate file and verify that:
+
 - The PKCS#12 container can be parsed using BouncyCastle (bypassing OpenSSL's FIPS restrictions on legacy container formats)
 - The certificate and private key are successfully imported into .NET's FIPS-validated crypto layer
 - Private key operations work correctly under strict FIPS mode

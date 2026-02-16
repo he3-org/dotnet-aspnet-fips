@@ -10,7 +10,14 @@
 // =============================================================================
 
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using Org.BouncyCastle.Pkcs;
+using Org.BouncyCastle.X509;
+using BcX509 = Org.BouncyCastle.X509.X509Certificate;
+
+// Load .env file if it exists (for local development)
+DotNetEnv.Env.Load();
 
 int passed = 0;
 int failed = 0;
@@ -145,6 +152,72 @@ try
 catch (Exception ex)
 {
     Fail("ECDSA P-256 sign/verify", ex.GetType().Name);
+}
+
+// X509Certificate2 loading from PFX (legacy PKCS#12 containers)
+// Legacy PFX files use non-FIPS algorithms (SHA-1 MAC, 3DES) for the container
+// envelope. We use BouncyCastle's fully managed Pkcs12Store to parse the
+// container (no OpenSSL calls), extract raw cert DER + PKCS#8 key bytes,
+// then import them into .NET/OpenSSL's FIPS-validated crypto layer.
+// This mirrors Windows FIPS mode where CNG handles PFX parsing internally.
+try
+{
+    var certDir = Path.Combine(AppContext.BaseDirectory, "test-certs");
+    var certFiles = Directory.GetFiles(certDir, "*.p12")
+        .Concat(Directory.GetFiles(certDir, "*.pfx"))
+        .ToArray();
+    if (certFiles.Length == 0)
+    {
+        Fail("X509Certificate2 load (PKCS#12)", "no .p12/.pfx files found in test-certs/");
+    }
+    else
+    {
+        // Read password from environment variable (set PFX_PASSWORD for your certs)
+        var password = Environment.GetEnvironmentVariable("PFX_PASSWORD") ?? string.Empty;
+
+        foreach (var certPath in certFiles)
+        {
+            var certName = Path.GetFileName(certPath);
+
+            // BouncyCastle: fully managed PKCS#12 parsing (no OpenSSL)
+            var store = new Pkcs12StoreBuilder().Build();
+            using (var fs = File.OpenRead(certPath))
+            {
+                store.Load(fs, password.ToCharArray());
+            }
+
+            string? alias = store.Aliases.Cast<string>()
+                .FirstOrDefault(a => store.IsKeyEntry(a));
+
+            if (alias == null)
+            {
+                Fail($"X509Certificate2 load ({certName})", "no key entry found in P12/PFX");
+                continue;
+            }
+
+            // Extract raw cert DER bytes (managed — no crypto needed)
+            BcX509 bcCert = store.GetCertificate(alias).Certificate;
+            byte[] certDer = bcCert.GetEncoded();
+
+            // Extract raw PKCS#8 private key bytes (managed — decrypted by BouncyCastle)
+            var keyEntry = store.GetKey(alias);
+            var keyInfo = Org.BouncyCastle.Pkcs.PrivateKeyInfoFactory.CreatePrivateKeyInfo(keyEntry.Key);
+            byte[] pkcs8Key = keyInfo.GetEncoded();
+
+            // Import into .NET — this uses OpenSSL FIPS for the actual crypto
+            using var cert = X509CertificateLoader.LoadCertificate(certDer);
+            using var rsa = RSA.Create();
+            rsa.ImportPkcs8PrivateKey(pkcs8Key, out _);
+            using var certWithKey = cert.CopyWithPrivateKey(rsa);
+
+            Pass($"X509Certificate2 load ({certName})",
+                $"Subject: {certWithKey.Subject}, HasPrivateKey: {certWithKey.HasPrivateKey}, KeySize: {rsa.KeySize}");
+        }
+    }
+}
+catch (Exception ex)
+{
+    Fail("X509Certificate2 load (PKCS#12)", $"{ex.GetType().Name}: {ex.Message}");
 }
 
 Console.WriteLine();

@@ -1,0 +1,43 @@
+# =============================================================================
+# Dockerfile.test — FIPS validation test container
+#
+# This Dockerfile packages the FipsValidation test application with the
+# FIPS-compliant ASP.NET Core runtime image for integration testing.
+#
+# Build instructions:
+#   1. Build the test application:
+#      docker run --rm -v "$(pwd)/tests/FipsValidation:/src" -w /src \
+#        mcr.microsoft.com/dotnet/sdk:10.0 \
+#        dotnet publish -c Debug -r linux-musl-x64 --self-contained false \
+#        -o /src/bin/Debug/net10.0/publish
+#
+#   2. Copy the published output to avoid .dockerignore conflicts:
+#      cp -r tests/FipsValidation/bin/Debug/net10.0/publish app-temp
+#
+#   3. Build the test container:
+#      docker build -f Dockerfile.test -t dotnet-aspnet-fips:test .
+#
+#   4. Run locally:
+#      docker run --rm dotnet-aspnet-fips:test
+#
+# Expected output: 11/11 tests passed, including:
+#   - FIPS-approved algorithms (SHA-256/384/512, AES, RSA, ECDSA)
+#   - X509 certificate loading from legacy PKCS#12 files via BouncyCastle
+#   - MD5 rejection (FIPS enforcement verification)
+#
+# Test results are written to both stdout and /tmp/test-results.txt
+# =============================================================================
+
+FROM henryerich/dotnet-aspnet-fips:latest
+
+# Copy the test application (pre-built and staged in app-temp/)
+# Note: The app-temp folder must exist before building this image
+COPY app-temp /app
+
+WORKDIR /app
+
+# Run the FIPS validation test on startup, display results, then keep container alive
+# - Test results appear in container logs (stdout)
+# - Test results are also saved to /tmp/test-results.txt for retrieval
+# - Container stays alive after test completion for log inspection
+CMD dotnet FipsValidation.dll 2>&1 | tee /tmp/test-results.txt && tail -f /dev/null

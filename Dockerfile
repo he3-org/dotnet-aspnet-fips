@@ -1,104 +1,104 @@
 # =============================================================================
 # dotnet-aspnet-fips
 #
-# ASP.NET Core 9.0 Runtime on debian:bookworm-slim with OpenSSL FIPS 140-2
-# validated module. The FIPS module is built from OpenSSL 3.0.9
-# (CMVP Certificate #4282).
+# ASP.NET Core 10.0 Runtime on alpine:3.23 with OpenSSL FIPS 140-2
+# validated module. The FIPS module is built from OpenSSL 3.1.2
+# (CMVP Certificate #4985).
 #
 # Replicates the official dotnet/dotnet-docker ASP.NET image layer chain:
 #   runtime-deps -> runtime -> aspnet
 # with FIPS modifications applied.
 #
 # Official Dockerfiles:
-#   runtime-deps: https://github.com/dotnet/dotnet-docker/blob/main/src/runtime-deps/9.0/bookworm-slim/amd64/Dockerfile
-#   runtime:      https://github.com/dotnet/dotnet-docker/blob/main/src/runtime/9.0/bookworm-slim/amd64/Dockerfile
-#   aspnet:       https://github.com/dotnet/dotnet-docker/blob/main/src/aspnet/9.0/bookworm-slim/amd64/Dockerfile
+#   runtime-deps: https://github.com/dotnet/dotnet-docker/blob/main/src/runtime-deps/10.0/alpine3.23/amd64/Dockerfile
+#   runtime:      https://github.com/dotnet/dotnet-docker/blob/main/src/runtime/10.0/alpine3.23/amd64/Dockerfile
+#   aspnet:       https://github.com/dotnet/dotnet-docker/blob/main/src/aspnet/10.0/alpine3.23/amd64/Dockerfile
 #
 # Architecture: amd64 (x86_64)
 # =============================================================================
 
 # ---------------------------------------------------------------------------
-# Stage 1: Build OpenSSL 3.0.9 FIPS provider module
+# Stage 1: Build OpenSSL 3.1.2 FIPS provider module
 # ---------------------------------------------------------------------------
-FROM debian:bookworm-20260202 AS fips-builder
+FROM amd64/alpine:3.23 AS fips-builder
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential \
-        ca-certificates \
+RUN apk add --no-cache \
+        build-base \
         curl \
-        perl \
-    && rm -rf /var/lib/apt/lists/*
+        linux-headers \
+        perl
 
-# OpenSSL 3.0.9 is the FIPS-validated version (CMVP Certificate #4282)
-ARG OPENSSL_FIPS_VERSION=3.0.9
+# OpenSSL 3.1.2 is the FIPS-validated version (CMVP Certificate #4985)
+ARG OPENSSL_FIPS_VERSION=3.1.2
 
-RUN curl -fSL "https://www.openssl.org/source/old/3.0/openssl-${OPENSSL_FIPS_VERSION}.tar.gz" \
+RUN curl -fSL "https://www.openssl.org/source/old/3.1/openssl-${OPENSSL_FIPS_VERSION}.tar.gz" \
         -o openssl.tar.gz \
     && tar xzf openssl.tar.gz \
     && cd openssl-${OPENSSL_FIPS_VERSION} \
     && ./Configure enable-fips \
         --prefix=/usr \
-        --openssldir=/usr/lib/ssl \
-        --libdir=lib/x86_64-linux-gnu \
+        --openssldir=/etc/ssl \
+        --libdir=lib \
     && make -j"$(nproc)" \
     && make install_fips
 
 # ---------------------------------------------------------------------------
 # Stage 2: Download .NET Runtime
 #
-# Mirrors the official runtime installer stage:
-#   FROM amd64/buildpack-deps:bookworm-curl AS installer
+# Mirrors the official runtime installer stage.
+# Uses Alpine with wget to match the official image pattern.
 # ---------------------------------------------------------------------------
-FROM amd64/buildpack-deps:bookworm-curl AS runtime-installer
+FROM amd64/alpine:3.23 AS runtime-installer
+
+RUN apk add --no-cache wget
 
 # Retrieve .NET Runtime
-RUN dotnet_version=9.0.12 \
-    && curl --fail --show-error --location \
-        --remote-name https://builds.dotnet.microsoft.com/dotnet/Runtime/$dotnet_version/dotnet-runtime-$dotnet_version-linux-x64.tar.gz \
-        --remote-name https://builds.dotnet.microsoft.com/dotnet/checksums/$dotnet_version-sha.txt \
-    && sed -i 's/\r$//' $dotnet_version-sha.txt \
-    && sha512sum -c $dotnet_version-sha.txt --ignore-missing \
+RUN dotnet_version=10.0.3 \
+    && wget \
+        https://builds.dotnet.microsoft.com/dotnet/Runtime/$dotnet_version/dotnet-runtime-$dotnet_version-linux-musl-x64.tar.gz \
+        https://builds.dotnet.microsoft.com/dotnet/Runtime/$dotnet_version/dotnet-runtime-$dotnet_version-linux-musl-x64.tar.gz.sha512 \
+    && sha512sum -c dotnet-runtime-$dotnet_version-linux-musl-x64.tar.gz.sha512 \
     && mkdir --parents /dotnet \
-    && tar --gzip --extract --no-same-owner --file dotnet-runtime-$dotnet_version-linux-x64.tar.gz --directory /dotnet \
+    && tar --gzip --extract --no-same-owner --file dotnet-runtime-$dotnet_version-linux-musl-x64.tar.gz --directory /dotnet \
     && rm \
-        dotnet-runtime-$dotnet_version-linux-x64.tar.gz \
-        $dotnet_version-sha.txt
+        dotnet-runtime-$dotnet_version-linux-musl-x64.tar.gz \
+        dotnet-runtime-$dotnet_version-linux-musl-x64.tar.gz.sha512
 
 # ---------------------------------------------------------------------------
 # Stage 3: Download ASP.NET Core Runtime
 #
-# Mirrors the official aspnet installer stage:
-#   FROM amd64/buildpack-deps:bookworm-curl AS installer
+# Mirrors the official aspnet installer stage.
 # ---------------------------------------------------------------------------
-FROM amd64/buildpack-deps:bookworm-curl AS aspnet-installer
+FROM amd64/alpine:3.23 AS aspnet-installer
+
+RUN apk add --no-cache wget
 
 # Retrieve ASP.NET Core
-RUN aspnetcore_version=9.0.12 \
-    && curl --fail --show-error --location \
-        --remote-name https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/$aspnetcore_version/aspnetcore-runtime-$aspnetcore_version-linux-x64.tar.gz \
-        --remote-name https://builds.dotnet.microsoft.com/dotnet/checksums/$aspnetcore_version-sha.txt \
-    && sed -i 's/\r$//' $aspnetcore_version-sha.txt \
-    && sha512sum -c $aspnetcore_version-sha.txt --ignore-missing \
+RUN aspnetcore_version=10.0.3 \
+    && wget \
+        https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/$aspnetcore_version/aspnetcore-runtime-$aspnetcore_version-linux-musl-x64.tar.gz \
+        https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/$aspnetcore_version/aspnetcore-runtime-$aspnetcore_version-linux-musl-x64.tar.gz.sha512 \
+    && sha512sum -c aspnetcore-runtime-$aspnetcore_version-linux-musl-x64.tar.gz.sha512 \
     && mkdir --parents /dotnet \
-    && tar --gzip --extract --no-same-owner --file aspnetcore-runtime-$aspnetcore_version-linux-x64.tar.gz --directory /dotnet ./shared/Microsoft.AspNetCore.App \
+    && tar --gzip --extract --no-same-owner --file aspnetcore-runtime-$aspnetcore_version-linux-musl-x64.tar.gz --directory /dotnet ./shared/Microsoft.AspNetCore.App \
     && rm \
-        aspnetcore-runtime-$aspnetcore_version-linux-x64.tar.gz \
-        $aspnetcore_version-sha.txt
+        aspnetcore-runtime-$aspnetcore_version-linux-musl-x64.tar.gz \
+        aspnetcore-runtime-$aspnetcore_version-linux-musl-x64.tar.gz.sha512
 
 # ---------------------------------------------------------------------------
 # Stage 4: Final image
 #
-# Built from debian:bookworm-slim (matching official runtime-deps),
+# Built from alpine:3.23 (matching official runtime-deps),
 # with .NET Runtime + ASP.NET Core Runtime + FIPS module layered on top.
 # ---------------------------------------------------------------------------
-FROM amd64/debian:bookworm-slim
+FROM amd64/alpine:3.23
 
 # -- Metadata ----------------------------------------------------------------
 LABEL maintainer="https://github.com/he3/dotnet-aspnet-fips" \
-      description="ASP.NET Core 9.0 Runtime with OpenSSL FIPS 140-2 validated module" \
+      description="ASP.NET Core 10.0 Runtime with OpenSSL FIPS 140-2 validated module" \
       org.opencontainers.image.source="https://github.com/he3/dotnet-aspnet-fips" \
-      openssl.fips.version="3.0.9" \
-      openssl.fips.certificate="4282"
+      openssl.fips.version="3.1.2" \
+      openssl.fips.certificate="4985"
 
 # -- runtime-deps environment variables (matches official runtime-deps) ------
 ENV \
@@ -107,56 +107,55 @@ ENV \
     # Configure web servers to bind to port 8080 when present
     ASPNETCORE_HTTP_PORTS=8080 \
     # Enable detection of running in a container
-    DOTNET_RUNNING_IN_CONTAINER=true
+    DOTNET_RUNNING_IN_CONTAINER=true \
+    # Set the invariant mode since ICU package isn't included (see https://github.com/dotnet/announcements/issues/20)
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=true
 
 # -- runtime-deps: Install .NET dependencies (matches official runtime-deps) -
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        ca-certificates \
+# Note: openssl CLI is added for FIPS configuration (not in official runtime-deps)
+RUN apk add --upgrade --no-cache \
+        ca-certificates-bundle \
+        openssl \
         \
         # .NET dependencies
-        libc6 \
-        libgcc-s1 \
-        libicu72 \
+        libgcc \
         libssl3 \
-        libstdc++6 \
-        tzdata \
-    && rm -rf /var/lib/apt/lists/*
+        libstdc++
 
 # -- runtime-deps: Create non-root user (matches official runtime-deps) ------
-RUN groupadd \
+RUN addgroup \
         --gid=$APP_UID \
         app \
-    && useradd --no-log-init \
+    && adduser \
         --uid=$APP_UID \
-        --gid=$APP_UID \
-        --create-home \
+        --ingroup=app \
+        --disabled-password \
         app
 
 # -- runtime: .NET Runtime version (matches official runtime) ----------------
-ENV DOTNET_VERSION=9.0.12
+ENV DOTNET_VERSION=10.0.3
 
 # -- runtime: Install .NET Runtime (matches official runtime) ----------------
 COPY --from=runtime-installer ["/dotnet", "/usr/share/dotnet"]
 RUN ln -s /usr/share/dotnet/dotnet /usr/bin/dotnet
 
 # -- aspnet: ASP.NET Core version (matches official aspnet) ------------------
-ENV ASPNET_VERSION=9.0.12
+ENV ASPNET_VERSION=10.0.3
 
 # -- aspnet: Install ASP.NET Core Runtime (matches official aspnet) ----------
 COPY --from=aspnet-installer ["/dotnet", "/usr/share/dotnet"]
 
 # -- Copy FIPS provider module from builder -----------------------------------
-ARG OPENSSL_MODULES=/usr/lib/x86_64-linux-gnu/ossl-modules
+ARG OPENSSL_MODULES=/usr/lib/ossl-modules
 
-COPY --from=fips-builder /usr/lib/ssl/fipsmodule.cnf /usr/lib/ssl/fipsmodule.cnf
-COPY --from=fips-builder /usr/lib/x86_64-linux-gnu/ossl-modules/fips.so ${OPENSSL_MODULES}/fips.so
+COPY --from=fips-builder /etc/ssl/fipsmodule.cnf /etc/ssl/fipsmodule.cnf
+COPY --from=fips-builder /usr/lib/ossl-modules/fips.so ${OPENSSL_MODULES}/fips.so
 
 # -- Configure OpenSSL for FIPS mode ------------------------------------------
 # Generate the fipsmodule.cnf with integrity check values for the installed module
 RUN openssl fipsinstall \
         -module ${OPENSSL_MODULES}/fips.so \
-        -out /usr/lib/ssl/fipsmodule.cnf
+        -out /etc/ssl/fipsmodule.cnf
 
 # Write the FIPS-enabled OpenSSL configuration
 RUN cp /etc/ssl/openssl.cnf /etc/ssl/openssl.cnf.bak \
@@ -165,7 +164,7 @@ RUN cp /etc/ssl/openssl.cnf /etc/ssl/openssl.cnf.bak \
 config_diagnostics = 1
 openssl_conf = openssl_init
 
-.include /usr/lib/ssl/fipsmodule.cnf
+.include /etc/ssl/fipsmodule.cnf
 
 [openssl_init]
 providers = provider_sect
@@ -181,7 +180,7 @@ activate = 1
 [algorithm_sect]
 default_properties = fips=yes
 
-# ---- stock CA / request defaults below (from Debian) ----
+# ---- stock CA / request defaults below (from Alpine) ----
 
 [ca]
 default_ca = CA_default

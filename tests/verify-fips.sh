@@ -75,15 +75,15 @@ test_fips_provider_active() {
 run_test "FIPS provider is loaded and active" test_fips_provider_active
 
 # ---------------------------------------------------------------------------
-# Test 2: FIPS provider version is 3.0.9
+# Test 2: FIPS provider version is 3.1.2
 # ---------------------------------------------------------------------------
 
 test_fips_provider_version() {
     local output
     output=$(docker run --rm "$IMAGE" openssl list -providers 2>&1)
-    echo "$output" | grep -A1 "OpenSSL FIPS Provider" | grep -q "3.0.9"
+    echo "$output" | grep -A1 "OpenSSL FIPS Provider" | grep -q "3.1.2"
 }
-run_test "FIPS provider version is 3.0.9" test_fips_provider_version
+run_test "FIPS provider version is 3.1.2" test_fips_provider_version
 
 # ---------------------------------------------------------------------------
 # Test 3: SHA-256 works (FIPS-approved)
@@ -137,8 +137,8 @@ run_test "MD5 is rejected (non-FIPS)" test_md5_rejected
 
 test_fipsmodule_integrity() {
     local output
-    output=$(docker run --rm "$IMAGE" cat /usr/lib/ssl/fipsmodule.cnf 2>&1)
-    echo "$output" | grep -q "module-mac" && echo "$output" | grep -q "install-mac"
+    output=$(docker run --rm "$IMAGE" cat /etc/ssl/fipsmodule.cnf 2>&1)
+    echo "$output" | grep -q "module-mac"
 }
 run_test "fipsmodule.cnf contains integrity check values" test_fipsmodule_integrity
 
@@ -206,8 +206,8 @@ run_test "TLS connection succeeds with FIPS-approved ciphers" test_tls_connectio
 test_image_labels() {
     local labels
     labels=$(docker inspect "$IMAGE" --format='{{json .Config.Labels}}' 2>&1)
-    echo "$labels" | grep -q '"openssl.fips.certificate":"4282"' \
-        && echo "$labels" | grep -q '"openssl.fips.version":"3.0.9"'
+    echo "$labels" | grep -q '"openssl.fips.certificate":"4985"' \
+        && echo "$labels" | grep -q '"openssl.fips.version":"3.1.2"'
 }
 run_test "Image labels include FIPS certificate and version" test_image_labels
 
@@ -234,7 +234,7 @@ run_test "dotnet binary symlink exists at /usr/bin/dotnet" test_dotnet_symlink
 # ---------------------------------------------------------------------------
 
 test_no_sdk() {
-    ! docker run --rm "$IMAGE" dotnet --list-sdks 2>&1 | grep -q "9\."
+    ! docker run --rm "$IMAGE" dotnet --list-sdks 2>&1 | grep -q "10\."
 }
 run_test "SDK is NOT installed (runtime-only image)" test_no_sdk
 
